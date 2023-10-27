@@ -2,7 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MessageEntity } from '@/src/entities/message.entity';
 
 import { BotProvider } from '@/src/providers/bot.provider';
-import { GoogleOauth2Provier } from '@/src/providers/google-oauth2.provider';
+
+import { memoize } from '@/src/decorators/memoize.decorator';
+import { RegistryProvider } from '@/src/providers/registry.provider';
+import { TelegramAuth } from '@/src/decorators/telegram-auth.decorator';
+import { TelegramAuthProvider } from '@/src/providers/telegram-auth.provider';
+// import { TelegramAuth } from '@/src/decorators/telegram-auth.decorator';
 
 @Injectable()
 export class TelegramService {
@@ -14,62 +19,30 @@ export class TelegramService {
    */
   constructor(
     private readonly botProvider: BotProvider,
-    private readonly googleOauth2Provier: GoogleOauth2Provier,
+    private readonly registryProvider: RegistryProvider,
+    public readonly telegramAuthProvider: TelegramAuthProvider,
   ) {
     this.logger = new Logger(TelegramService.name);
 
-    // Set bot commands.
-    this.botProvider.bot.setMyCommands([
-      {
-        command: 'start',
-        description: 'Start bot',
-      },
-      {
-        command: 'help',
-        description: 'Help bot',
-      },
-      {
-        command: 'login',
-        description: 'Login to Kollec',
-      },
-    ]);
+    this.botProvider.bot.setMyCommands(
+      this.registryProvider.getConfig().botCommands,
+    );
 
     // Handle on receive message.
-    this.botProvider.bot.on('message', this.onReceiveMessage);
+    this.botProvider.bot.on('message', this.onReceiveMessage.bind(this));
   }
 
   /**
    * @dev Handle received message.
    * @param {MessageEntity} msg Message.
    */
-  private onReceiveMessage = (msg: MessageEntity) => {
-    /**
-     * @dev Handle on receive command.
-     */
+  @memoize()
+  @TelegramAuth()
+  private async onReceiveMessage(msg: MessageEntity) {
+    console.log('message listen');
     if (msg.entities?.find((entity) => entity.type === 'bot_command')) {
       // Handle on receive command.
-      switch (msg.text) {
-        case '/login':
-          this.botProvider.bot.sendMessage(
-            msg.chat.id,
-            `Let's login at KollecTech 🚀`,
-            {
-              reply_markup: {
-                inline_keyboard: [
-                  [
-                    {
-                      text: `Open App`,
-                      url: 't.me/KollecTech_bot/KollecTech',
-                    },
-                  ],
-                ],
-              },
-            },
-          );
-          break;
-        default:
-          break;
-      }
+      console.log('Command listen');
     }
-  };
+  }
 }

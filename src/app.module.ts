@@ -3,10 +3,13 @@ import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 
 import { AppService } from './app.service';
+import { OrmModule } from './orm/orm.module';
 import { AppController } from './app.controller';
 import { getMemoryServerMongoUri } from './helpers';
 import { TelegramModule } from './telegram/telegram.module';
+import { NetworkProvider } from './providers/network.provider';
 import { RegistryProvider } from './providers/registry.provider';
+import { TelegramService } from './telegram/telegram.service';
 
 @Module({
   imports: [
@@ -35,8 +38,9 @@ import { RegistryProvider } from './providers/registry.provider';
     }),
 
     TelegramModule,
+    OrmModule,
   ],
   controllers: [AppController],
-  providers: [RegistryProvider, AppService],
+  providers: [RegistryProvider, NetworkProvider, AppService, TelegramService],
 })
 export class AppModule {}

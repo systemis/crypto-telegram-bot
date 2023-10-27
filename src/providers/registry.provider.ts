@@ -1,26 +1,42 @@
 import { Global } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { keys } from 'ts-transformer-keys';
-import { IsNotEmpty, IsString, validateSync } from 'class-validator';
 import { plainToClass } from 'class-transformer';
+import { BotCommand } from 'node-telegram-bot-api';
+import { autoImplement } from '@/src/utils/type.util';
+import { IsNotEmpty, IsString, validateSync } from 'class-validator';
 
-export interface ISystemConfig {
-  NODE_ENV: string;
-  DB_URL: string;
-  TELEGRAM_TOKEN: string;
-  GOOGLE_CLIENT_ID: string;
-  GOOGLE_CLIENT_SECRET: string;
-  GOOGLE_REGIRECT_URL: string;
+import { BOT_COMMANDS } from '@/src/entities/bot.entity';
+
+enum SystemConfigKeys {
+  DB_URL = 'DB_URL',
+  NODE_ENV = 'NODE_ENV',
+  TELEGRAM_TOKEN = 'TELEGRAM_TOKEN',
+  GOOGLE_CLIENT_ID = 'GOOGLE_CLIENT_ID',
+  GOOGLE_CLIENT_SECRET = 'GOOGLE_CLIENT_SECRET',
+  GOOGLE_REGIRECT_URL = 'GOOGLE_REGIRECT_URL',
+
+  WEB3AUTH_KID = 'WEB3AUTH_KID',
+  WEB3AUTH_CLIENTID = 'WEB3AUTH_CLIENTID',
+}
+export interface ISystemConfigEnv {
+  [SystemConfigKeys.NODE_ENV]: string;
+  [SystemConfigKeys.DB_URL]: string;
+  [SystemConfigKeys.TELEGRAM_TOKEN]: string;
+  [SystemConfigKeys.GOOGLE_CLIENT_ID]: string;
+  [SystemConfigKeys.GOOGLE_CLIENT_SECRET]: string;
+
+  [SystemConfigKeys.WEB3AUTH_KID]: string;
+  [SystemConfigKeys.WEB3AUTH_CLIENTID]: string;
 }
 
-export class SystemConfig implements ISystemConfig {
+export class SystemConfigEnv implements ISystemConfigEnv {
   /**
    * @var {string} NODE_ENV
    * @dev The environment of the system.
    */
   @IsString()
-  NODE_ENV: string;
+  [SystemConfigKeys.NODE_ENV]: string;
 
   /**
    * @var {string} DB_URL
@@ -28,7 +44,7 @@ export class SystemConfig implements ISystemConfig {
    */
   @IsString()
   @IsNotEmpty()
-  DB_URL: string;
+  [SystemConfigKeys.DB_URL]: string;
 
   /**
    * @var {string} TELEGRAM_TOKEN
@@ -36,7 +52,7 @@ export class SystemConfig implements ISystemConfig {
    */
   @IsString()
   @IsNotEmpty()
-  TELEGRAM_TOKEN: string;
+  [SystemConfigKeys.TELEGRAM_TOKEN]: string;
 
   /**
    * @var {string} GOOGLE_CLIENT_ID
@@ -44,7 +60,7 @@ export class SystemConfig implements ISystemConfig {
    */
   @IsString()
   @IsNotEmpty()
-  GOOGLE_CLIENT_ID: string;
+  [SystemConfigKeys.GOOGLE_CLIENT_ID]: string;
 
   /**
    * @var {string} GOOGLE_CLIENT_SECRET
@@ -52,7 +68,7 @@ export class SystemConfig implements ISystemConfig {
    */
   @IsString()
   @IsNotEmpty()
-  GOOGLE_CLIENT_SECRET: string;
+  [SystemConfigKeys.GOOGLE_CLIENT_SECRET]: string;
 
   /**
    * @var {string} GOOGLE_REGIRECT_URL
@@ -61,7 +77,42 @@ export class SystemConfig implements ISystemConfig {
    */
   @IsString()
   @IsNotEmpty()
-  GOOGLE_REGIRECT_URL: string;
+  [SystemConfigKeys.GOOGLE_REGIRECT_URL]: string;
+
+  /**
+   * @var {string} WEB3AUTH_KID
+   * @dev The kid of the Web3Auth.
+   */
+  @IsString()
+  @IsNotEmpty()
+  [SystemConfigKeys.WEB3AUTH_KID]: string;
+
+  /**
+   * @var {string} WEB3AUTH_CLIENTID
+   * @dev The client ID of the Web3Auth.
+   */
+  @IsString()
+  @IsNotEmpty()
+  [SystemConfigKeys.WEB3AUTH_CLIENTID]: string;
+
+  /**
+   * @dev The function to ensure the schema of the config.
+   * @throws Error if the schema is not valid.
+   */
+  public ensureValidSchema() {
+    const errors = validateSync(this);
+    if (errors.length > 0) {
+      throw new Error(JSON.stringify(errors.map((elm) => elm.constraints)));
+    }
+  }
+}
+
+export class SystemConfig extends autoImplement<SystemConfigEnv>() {
+  /**
+   * @var {string} NODE_ENV
+   * @dev The environment of the system.
+   */
+  botCommands: BotCommand[];
 
   /**
    * @dev The function to ensure the schema of the config.
@@ -93,7 +144,9 @@ export class RegistryProvider {
   public static load() {
     // Read the environment variables.
     const configService = new ConfigService();
-    const envObj = keys<ISystemConfig>().reduce((prev, curr) => {
+
+    // Read the environment variables and assign them to the object.
+    const envObj = Object.values(SystemConfigKeys).reduce((prev, curr) => {
       return {
         ...prev,
         [curr]: configService.get<string>(curr),
@@ -101,7 +154,13 @@ export class RegistryProvider {
     }, {});
 
     // Read the config file.
-    const config = plainToClass(SystemConfig, envObj);
+    const configEnv = plainToClass(SystemConfigEnv, envObj);
+    configEnv.ensureValidSchema();
+
+    const config: SystemConfig = plainToClass(SystemConfig, {
+      ...envObj,
+      botCommand: BOT_COMMANDS,
+    });
 
     // Assign the config to the static variable and validate the schema.
     RegistryProvider.config = config;
